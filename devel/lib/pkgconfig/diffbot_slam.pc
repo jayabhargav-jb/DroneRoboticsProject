@@ -1,8 +1,0 @@
-prefix=/home/bhargav-u20/drone_ws/devel
-
-Name: diffbot_slam
-Description: Description of diffbot_slam
-Version: 1.1.0
-Cflags: 
-Libs: -L${prefix}/lib 
-Requires: 
