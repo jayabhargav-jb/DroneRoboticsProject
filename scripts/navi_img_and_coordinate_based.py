@@ -258,7 +258,7 @@ class DroneLanding:
             sleep(0.1)
             self.hover()
 
-        if distance < 0.03:
+        if distance < 0.02:
             self.hover()
             rospy.signal_shutdown("Done")
 

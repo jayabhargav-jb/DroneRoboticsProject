@@ -1,14 +1,14 @@
 # Objective: Land a UAV on a movable platform
 
 ## Prerequisites:
-ROS Noetic
-Gazebo
-Rviz
-Python 
-    -OpenCV
-    -Rospy
-    -Numpy
-
+ROS Noetic <br/>
+Gazebo <br/>
+Rviz <br/>
+Python <br/>
+____OpenCV <br/>
+____Rospy <br/>
+____Numpy <br/>
+<br/>
 
 ## Steps to run the navigation file
 1. Build the project by running catkin_make in the top level of the repo.
