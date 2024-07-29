@@ -5,9 +5,9 @@ ROS Noetic <br/>
 Gazebo <br/>
 Rviz <br/>
 Python <br/>
-____OpenCV <br/>
-____Rospy <br/>
-____Numpy <br/>
+-OpenCV <br/>
+-Rospy <br/>
+-Numpy <br/>
 <br/>
 
 ## Steps to run the navigation file
