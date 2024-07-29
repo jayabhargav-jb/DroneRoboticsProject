@@ -1,0 +1,8 @@
+prefix=/home/bhargav-u20/drone_ws/devel
+
+Name: diffbot_msgs
+Description: Description of diffbot_msgs
+Version: 1.1.0
+Cflags: -I/home/bhargav-u20/drone_ws/devel/include
+Libs: -L${prefix}/lib 
+Requires: message_runtime std_msgs

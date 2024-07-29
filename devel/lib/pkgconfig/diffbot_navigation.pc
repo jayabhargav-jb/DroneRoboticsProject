@@ -1,0 +1,8 @@
+prefix=/home/bhargav-u20/drone_ws/devel
+
+Name: diffbot_navigation
+Description: Description of diffbot_navigation
+Version: 1.1.0
+Cflags: 
+Libs: -L${prefix}/lib 
+Requires: 
