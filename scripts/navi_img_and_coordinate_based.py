@@ -6,24 +6,33 @@ from sensor_msgs.msg import Image
 from nav_msgs.msg import Odometry
 from gazebo_msgs.msg import ModelStates
 from cv_bridge import CvBridge, CvBridgeError
-from geometry_msgs.msg import Twist
+from geometry_msgs.msg import Twist, PoseStamped
 from time import sleep
 
 class DroneLanding:
 
-    def __init__(self, img_topic = "/first/front_cam/camera/image", vel_topic = "/first/cmd_vel", vehicle_coor_topic = "/atom/odom", uav_coor_topic = "/gazebo/model_states"):
+    def __init__(self, img_topic = "/first/front_cam/camera/image", vel_topic = "/first/cmd_vel", coor_topic = "/gazebo/model_states"):
         # initialze the node and topic publish and subscribe
-        rospy.init_node('Landing_node', anonymous=True)
+        rospy.init_node('Landing_node')
         self.vel_pub = rospy.Publisher(vel_topic, Twist, queue_size=1)
         self.image_sub = rospy.Subscriber(img_topic,Image, self.imageCallback)
-        self.vehicle_position = rospy.Subscriber(vehicle_coor_topic, Odometry, self.position_wheeled_bot)
-        self.move_uav_position = rospy.Subscriber(uav_coor_topic, ModelStates, self.position_move_uav_bot)
+        # self.vehicle_position = rospy.Subscriber(vehicle_coor_topic, Odometry, self.position_wheeled_bot)
+        self.vehicle_position = rospy.Subscriber(coor_topic, ModelStates, self.position_bots, queue_size=1)
         self.bridge = CvBridge()
 
         # track status
         self.detected = 0
         self.count_detected = 0
-        self.launched = 500001 #0
+        self.launched = 0 #500001 #
+
+        # initial coordinate status
+        self.gx, self.gy, self.gz, self.ux, self.uy, self.uz = 0, 0, 0, 0, 0, 0
+
+        while self.launched < 50000:
+            self.up()
+            # sleep(5)
+            self.hover()
+            self.launched += 1
 
         # continuous execution
         try:
@@ -108,7 +117,7 @@ class DroneLanding:
                 # print(perimeter)
                 approx = cv2.approxPolyDP(cnt, 0.02 * perimeter, True) # contour, resolution, is closed(?)
                 # print(approx) # gives corner points for each contour (shape)
-                print(len(approx)) # prints number of vertices
+                # print(len(approx)) # prints number of vertices
                 objCor = len(approx) # number of corners (higher the number, more likely to be a circle)
                 x, y, w, h = cv2.boundingRect(approx) # coordinates of each shape
 
@@ -157,13 +166,7 @@ class DroneLanding:
         # if detected==0:
         #     self.ccw()
         #     sleep(0.01)
-
-        # IMPORTANT UNCOMMENT LATER
-        while self.launched < 50000:
-            self.up()
-            # sleep(5)
-            self.hover()
-            self.launched += 1
+        
 
     
     def stackImages(self, scale,imgArray):
@@ -197,13 +200,18 @@ class DroneLanding:
             ver = hor
         return ver
     
-    def position_wheeled_bot(self, pose_data):
-        self.gx, self.gy, self.gz = pose_data.pose.pose.position.x, pose_data.pose.pose.position.y, pose_data.pose.pose.position.z
-        # print(self.gx)
+    # def position_wheeled_bot(self, pose_data):
+    #     self.gx, self.gy, self.gz = pose_data.pose[2].position.x, pose_data.pose[2].position.y, pose_data.pose[2].position.z
+    #     # print(self.gx)
 
-    def position_move_uav_bot(self, pose_data):
-        self.ux, self.uy, self.uz = pose_data.pose[2].position.x, pose_data.pose[2].position.y, pose_data.pose[2].position.z
-        self.move_to_coordinates
+    def position_bots(self, pose_data):
+        # print(pose_data.pose)
+        self.gx, self.gy, self.gz = pose_data.pose[2].position.x, pose_data.pose[2].position.y, pose_data.pose[2].position.z
+        self.ux, self.uy, self.uz = pose_data.pose[1].position.x, pose_data.pose[1].position.y, pose_data.pose[1].position.z
+        # print(self.gx, self.gy)
+        # print(self.ux, self.uy)
+        self.move_to_coordinates()
+
         # print(self.ux)
     
     # def euler_from_quaternion(self, x, y, z, w):
@@ -238,94 +246,32 @@ class DroneLanding:
 
         """
         
-        rate = rospy.Rate(10)  # Set loop rate to 10 Hz
-
-        while not rospy.is_shutdown():
-            dx = self.gx - self.ux  # Calculate the difference between target x and current x
-            dy = self.gy - self.uy  # Calculate the difference between target y and current y
-            dz = self.gz - self.uz  # Calculate the difference between target z and current z
-            
-            distance = (dx**2 + dy**2 + dz**2)**0.5  # Calculate the Euclidean distance to the target
-            
-            if distance < 0.1:  # Check if the drone is close enough to the target coordinates
-                self.hover()  # Hover if the target coordinates are reached
-                break
-            
-            vx = dx * 0.1  # Calculate forward/backward velocity based on x difference (proportional control)
-            vy = dy * 0.1  # Calculate left/right velocity based on y difference (proportional control)
-            vz = dz * 0.1  # Calculate vertical velocity based on z difference (proportional control)
-            
-            self.initMessage(vx, vy, vz, 0.0)  # Send the velocity command
-            rate.sleep()  # Wait for the next iteration (10 Hz)
-            
-
-    # def takeoff(target_z):
-    #     """
-    #     Commands the drone to take off to the specified altitude (target_z).
+        dx = self.gx - self.ux  # Calculate the difference between target x and current x
+        dy = self.gy - self.uy  # Calculate the difference between target y and current y
         
-    #     :param target_z: Target altitude for takeoff
-    #     """
-    #     global current_z  # Use global variable for current altitude
+        # dz = self.gz - self.uz  # Calculate the difference between target z and current z
         
-    #     rate = rospy.Rate(10)  # Set loop rate to 10 Hz
+        distance = (dx**2 + dy**2)**0.5  # Calculate the Euclidean distance to the target # + dz**2
+        # print(dx, dy)
+        if distance < 0.1 and distance > 0.03:  # Check if the drone is close enough to the target coordinates
+            self.initMessage(0.0, 0.0, -0.01, 0)  # Hover if the target coordinates are reached
+            sleep(0.1)
+            self.hover()
 
-    #     while not rospy.is_shutdown():
-    #         dz = target_z - current_z  # Calculate the difference between target and current altitude
-            
-    #         if abs(dz) < 0.1:  # Check if the drone is close enough to the target altitude
-    #             hover()  # Hover if the target altitude is reached
-    #             break
-            
-    #         vz = dz * 0.1  # Calculate vertical velocity based on altitude difference (proportional control)
-    #         initMessage(0.0, 0.0, vz, 0.0)  # Send the vertical velocity command
-    #         rate.sleep()  # Wait for the next iteration (10 Hz)
+        if distance < 0.03:
+            self.hover()
+            rospy.signal_shutdown("Done")
 
-    
-
-    # def land():
-    #     """
-    #     Commands the drone to land by descending at a constant rate.
-    #     """
-    #     initMessage(0.0, 0.0, -1.0, 0.0)  # Send a command to descend (negative vertical velocity)
-
-    # def main():
-    #     """
-    #     Main function to initialize the ROS node and execute movements.
-    #     """
-    #     rospy.init_node('UAVControl', anonymous=True)  # Initialize the ROS node with name 'UAVControl'
+        print("distance remaining: ", distance)
         
-    #     rospy.Subscriber('/odom', Odometry, update_position)  # Subscribe to the odometry topic and register the callback
+        vx = dx * 0.1  # Calculate forward/backward velocity based on x difference (proportional control)
+        vy = dy * 0.1  # Calculate left/right velocity based on y difference (proportional control)
+        # vz = dz * 0.1  # Calculate vertical velocity based on z difference (proportional control)
         
-    #     print("Taking off...")
-    #     takeoff(1.0)  # Take off to 1 meter altitude
-    #     sleep(2)  # Wait for a bit to stabilize
+        self.initMessage(vx, vy, 0.0, 0.0)  # Send the velocity command
+        sleep(0.1)
+        self.hover()
 
-    #     print("Moving to coordinates...")
-    #     move_to_coordinates(5.0, 2.0, 0.0)  # Move to target coordinates (5,2,0)
-    #     sleep(2)  # Wait for a bit to stabilize
-
-    #     print("Hovering...")
-    #     hover()  # Hover in place
-    #     sleep(2)  # Hover for 2 seconds
-
-    #     print("Landing...")
-    #     land()  # Land
-    #     sleep(5)  # Wait for landing to complete
-
-    #     print("Shutdown complete.")
-    #     rospy.signal_shutdown("Finished executing movement commands.")  # Shutdown ROS node
-
-
-# def main():
-#     global vel_pub
-#     vel_pub = rospy.Publisher('/first/cmd_vel', Twist, queue_size=1)
-#     vel_msg = Twist()
-#     vel_msg.linear.z = float(1.0)
-#     vel_pub.publish(vel_msg)
-#     sleep(3)
-
-#     rospy.spin()
-#     cv2.destroyAllWindows()
 
 if __name__ == "__main__":
     drone_class = DroneLanding()
